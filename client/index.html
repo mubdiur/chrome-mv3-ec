@@ -21,7 +21,7 @@
         height: 80vh;
         width: 80vw;
       }
-      textarea {
+      textarea, input {
         width: 1000px;
         height: 300px;
         resize: none;
@@ -67,7 +67,7 @@
       }
 
       /* focus outline for text area to light blue */
-      textarea:focus {
+      textarea:focus, input:focus {
         outline: 2px solid rgb(7, 123, 255);
       }
 
@@ -86,9 +86,24 @@
         font-size: 1.5rem;
       }
 
+      #extension-id {
+        padding: 8px;
+        border: 1px solid #333;
+        border-radius: 5px;
+        height: 1.75rem;
+      }
+
     </style>
   </head>
   <body>
+    <!-- input for extension id -->
+    <label for="extension-id">Extension ID</label>
+    <input
+      type="text"
+      id="extension-id"
+      placeholder="Enter extension ID"
+      value="lbgelgcppncffdeenpjdboelodopiign"
+    />
     <!-- button with text connect -->
     <button id="connect">Connect</button>
     <!-- html form with one text area and a send button -->
@@ -106,16 +121,21 @@
       // implement connect button to connect to the extension with external connection
       const connect = document.getElementById("connect");
       connect.addEventListener("click", () => {
-        const externalExtensionId = "nlecheneiomonofnkbhjfelihhimfpdc";
+        // get the extension id
+        const extensionId = document.getElementById("extension-id").value;
         try {
           let timeNow = Date.now();
           const timer = startTimer();
-          const port = chrome.runtime.connect(externalExtensionId);
+  
+          const port = chrome.runtime.connect(extensionId);
 
           appendMessage(JSON.stringify(port, null, 2));
           // listen for messages from the extension
           port.onMessage.addListener((message) => {
-            setMessage(message);
+            if(message.type === 'keep_alive') {
+              port.postMessage({ type: 'keep_alive' });
+            }
+            setMessage(JSON.stringify(message, null, 2));
           });
 
           port.postMessage({ message: "Hello from client!" });

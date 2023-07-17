@@ -1,17 +1,45 @@
-let minutes = 5;
-let intervalSeconds = minutes ? minutes * 60 : 15;
+let minutes = 0;
+let seconds = 5;
+let intervalSeconds = minutes ? minutes * 60 : seconds;
+let intervalMs = intervalSeconds * 1000;
+let connectionBeginTime = Date.now();
+
+function formatTime(milliseconds) {
+  var seconds = Math.floor(milliseconds / 1000);
+  var minutes = Math.floor(seconds / 60);
+  var hours = Math.floor(minutes / 60);
+
+  milliseconds %= 1000;
+  seconds %= 60;
+  minutes %= 60;
+
+  var formattedTime =
+    hours.toString().padStart(2, "0") +
+    "h:" +
+    minutes.toString().padStart(2, "0") +
+    "m:" +
+    seconds.toString().padStart(2, "0") +
+    "s." +
+    milliseconds.toString().padStart(3, "0");
+
+  return formattedTime;
+}
 
 chrome.runtime.onInstalled.addListener(() => {
   console.log('Extension installed!');
 });
 let _port = null;
 let count = 0;
+let startTime = new Date().toLocaleTimeString();
 // handle external connection
 chrome.runtime.onConnectExternal.addListener((port) => {
   console.log('External connection established!');
   port.onMessage.addListener((message) => {
+    if (message.type === 'keep_alive') return;
+
+    connectionBeginTime = Date.now();
     console.log('External message received: ' + JSON.stringify(message, null, 2));
-    port.postMessage(`Message received by extension!\ninterval: ${minutes} minutes or ${intervalSeconds} seconds}`);
+    port.postMessage(`Message received by extension! Wait for ${formatTime(intervalMs)}`);
   });
 
   port.onDisconnect.addListener(() => {
@@ -25,19 +53,15 @@ chrome.runtime.onConnectExternal.addListener((port) => {
 // keep sending count++ with an interval of 3 seconds through _port if _port is not null
 setInterval(() => {
   if (_port) {
-    const timeSeconds = count * intervalSeconds;
-    const timeMinutes = Number.prototype.toFixed.call(timeSeconds / 60, 2);
-    const timeHours = Number.prototype.toFixed.call(timeSeconds / 3600, 2);
+    const timeNow = Date.now();
     const message = {
+      type: 'keep_alive',
       count: count++,
-      interval: minutes ? minutes + ' minutes' : intervalSeconds + ' seconds',
-      timeElapsed: {
-        seconds: timeSeconds + ' seconds',
-        minutes: timeMinutes + ' minutes',
-        hours: timeHours + ' hours',
-      },
-      time: new Date().toLocaleTimeString(),
+      interval: formatTime(intervalMs),
+      timeElapsed: formatTime(timeNow - connectionBeginTime),
+      startTime,
+      currentTime: new Date().toLocaleTimeString(),
     }
-    _port.postMessage(JSON.stringify(message, null, 2));
+    _port.postMessage(message);
   }
-}, 1000 * intervalSeconds);
+}, intervalMs);
