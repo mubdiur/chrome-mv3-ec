@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Extension</title>
+
+    <style>
+      /* css for the entire html with basic stuff */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      /* css for the form button and text area */
+      form {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: top;
+        height: 80vh;
+        width: 80vw;
+      }
+      textarea {
+        width: 1000px;
+        height: 300px;
+        resize: none;
+        margin-bottom: 20px;
+        /* rounded border */
+        border-radius: 5px;
+      }
+      button {
+        width: 100px;
+        height: 50px;
+        border: none;
+        border-radius: 5px;
+        background-color: #000;
+        color: #fff;
+        cursor: pointer;
+      }
+
+      /* center the #connect button horizontally using grid */
+      body {
+        display: grid;
+        place-items: center;
+        height: 100vh;
+        padding-top: 40px;
+      }
+
+      #messages {
+        width: 1000px;
+        height: 400px;
+        resize: none;
+        margin-bottom: 20px;
+        /* fixed width monospace fonts */
+        font-family: monospace;
+        overflow: scroll;
+        padding: 16px;
+      }
+
+      #connect {
+        margin: 24px;
+      }
+
+      #text {
+        padding: 16px;
+      }
+
+      /* focus outline for text area to light blue */
+      textarea:focus {
+        outline: 2px solid rgb(7, 123, 255);
+      }
+
+      /* style for label */
+      label {
+        font-size: 1rem;
+        margin-bottom: 8px;
+      }
+
+      /* style for hover effect on buttons */
+      button:hover {
+        background-color: #333;
+      }
+
+      #timer {
+        font-size: 1.5rem;
+      }
+
+    </style>
+  </head>
+  <body>
+    <!-- button with text connect -->
+    <button id="connect">Connect</button>
+    <!-- html form with one text area and a send button -->
+    <!-- read only text area without forms of buttons for showing messages in fixed width font -->
+    <p id="timer"></p>
+    <label for="messages">Output</label>
+    <textarea id="messages" cols="30" rows="10" readonly></textarea>
+
+    <form>
+      <label for="text">Input</label>
+      <textarea name="text" id="text" cols="30" rows="10"></textarea>
+      <button type="submit" id="send">Send</button>
+    </form>
+    <script>
+      // implement connect button to connect to the extension with external connection
+      const connect = document.getElementById("connect");
+      connect.addEventListener("click", () => {
+        const externalExtensionId = "nlecheneiomonofnkbhjfelihhimfpdc";
+        try {
+          let timeNow = Date.now();
+          const timer = startTimer();
+          const port = chrome.runtime.connect(externalExtensionId);
+
+          appendMessage(JSON.stringify(port, null, 2));
+          // listen for messages from the extension
+          port.onMessage.addListener((message) => {
+            setMessage(message);
+          });
+
+          port.postMessage({ message: "Hello from client!" });
+
+          // port on disconnect
+          port.onDisconnect.addListener(() => {
+            appendMessage(
+              "Disconnected after: " + formatTime(Date.now() - timeNow)
+            );
+            pauseTimer(timer);
+          });
+        } catch (error) {
+          console.log("Could not connect to extension: ", error.message);
+        }
+      });
+
+      // make a method that appends text to the text area with the id=messages
+      const appendMessage = (message) => {
+        const messages = document.getElementById("messages");
+        messages.value += `\n${message}`;
+      };
+
+      // make a set message method sets text to the text area with the id=messages
+      const setMessage = (message) => {
+        const messages = document.getElementById("messages");
+        messages.value = message;
+      };
+
+      // make a method that clears the textarea with messages id
+      const clearMessages = () => {
+        const messages = document.getElementById("messages");
+        messages.value = "";
+      };
+
+      function formatTime(milliseconds) {
+        var seconds = Math.floor(milliseconds / 1000);
+        var minutes = Math.floor(seconds / 60);
+        var hours = Math.floor(minutes / 60);
+
+        milliseconds %= 1000;
+        seconds %= 60;
+        minutes %= 60;
+
+        var formattedTime =
+          hours.toString().padStart(2, "0") +
+          "h:" +
+          minutes.toString().padStart(2, "0") +
+          "m:" +
+          seconds.toString().padStart(2, "0") +
+          "s." +
+          milliseconds.toString().padStart(3, "0");
+
+        return formattedTime;
+      }
+
+      // start timer function for the id=timer
+      function startTimer() {
+        var startTime = Date.now();
+        return setInterval(function printTime() {
+          document.getElementById("timer").innerHTML = formatTime(
+            Date.now() - startTime
+          );
+        }, 100);
+      }
+
+      // pause timer
+      function pauseTimer(timer) {
+        clearInterval(timer);
+      }
+    </script>
+  </body>
+</html>
