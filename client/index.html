@@ -102,7 +102,7 @@
       type="text"
       id="extension-id"
       placeholder="Enter extension ID"
-      value="lbgelgcppncffdeenpjdboelodopiign"
+      value="ibhdgmbmnnkmefdpdebkiihikieihihp"
     />
     <!-- button with text connect -->
     <button id="connect">Connect</button>
@@ -129,12 +129,16 @@
   
           const port = chrome.runtime.connect(extensionId);
 
+          // set interval
+          const interval = setInterval(() => {
+            port.postMessage({ type: "keep_alive" });
+          }, 5000);
           appendMessage(JSON.stringify(port, null, 2));
           // listen for messages from the extension
           port.onMessage.addListener((message) => {
-            if(message.type === 'keep_alive') {
-              port.postMessage({ type: 'keep_alive' });
-            }
+            // if(message.type === 'keep_alive') {
+            //   port.postMessage({ type: 'keep_alive' });
+            // }
             setMessage(JSON.stringify(message, null, 2));
           });
 

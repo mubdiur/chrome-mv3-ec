@@ -1,5 +1,5 @@
-let minutes = 0;
-let seconds = 5;
+let minutes = 1;
+let seconds = 0;
 let intervalSeconds = minutes ? minutes * 60 : seconds;
 let intervalMs = intervalSeconds * 1000;
 let connectionBeginTime = Date.now();
@@ -35,7 +35,10 @@ let startTime = new Date().toLocaleTimeString();
 chrome.runtime.onConnectExternal.addListener((port) => {
   console.log('External connection established!');
   port.onMessage.addListener((message) => {
-    if (message.type === 'keep_alive') return;
+    if (message.type === 'keep_alive') {
+      console.log('External message received: ' + JSON.stringify(message, null, 2));
+      return;
+    }
 
     connectionBeginTime = Date.now();
     console.log('External message received: ' + JSON.stringify(message, null, 2));
