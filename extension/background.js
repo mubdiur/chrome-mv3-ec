@@ -53,6 +53,53 @@ chrome.runtime.onConnectExternal.addListener((port) => {
   _port = port;
 });
 
+chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
+  if (message.type === 'clickEvent') {
+    console.log('Message received: ' + JSON.stringify(message, null, 2));
+    // attach debugger to sender tab
+
+    // get nodeid for the clientX and clientY coordinates
+    const { clientX, clientY } = message;
+    const nodeId = await chrome.debugger.sendCommand({ tabId: sender.tab.id }, 'DOM.getNodeForLocation', {
+      x: clientX,
+      y: clientY,
+      includeUserAgentShadowDOM: true,
+    });
+    console.log('Node id: ' + JSON.stringify(nodeId, null, 2));
+    const resultNode = await chrome.debugger.sendCommand({ tabId: sender.tab.id }, 'DOM.describeNode', {
+      backendNodeId: nodeId.backendNodeId,
+      depth: -1,
+      pierce: true,
+    });
+    console.log('Node Description: ' + JSON.stringify(resultNode, null, 2));
+    chrome.debugger.sendCommand({ tabId: sender.tab.id }, 'DOM.highlightNode', {
+      backendNodeId: nodeId.backendNodeId,
+      highlightConfig: {
+        contentColor: {
+          r: 255,
+          g: 0,
+          b: 0,
+          a: 0.3,
+        },
+        borderColor: {
+          r: 255,
+          g: 0,
+          b: 0,
+          a: 0.3,
+        },
+        showInfo: true,
+      },
+    });
+    return;
+  }
+  if (message.type === 'attachDebugger') {
+    await chrome.debugger.attach({ tabId: sender.tab.id }, '1.3');
+    // enable dom
+    await chrome.debugger.sendCommand({ tabId: sender.tab.id }, 'DOM.enable');
+    // enable overlay
+    await chrome.debugger.sendCommand({ tabId: sender.tab.id }, 'Overlay.enable');
+  }
+});
 // keep sending count++ with an interval of 3 seconds through _port if _port is not null
 setInterval(() => {
   if (_port) {
