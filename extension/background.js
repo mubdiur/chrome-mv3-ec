@@ -56,43 +56,31 @@ chrome.runtime.onConnectExternal.addListener((port) => {
 chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
   if (message.type === 'clickEvent') {
     console.log('Message received: ' + JSON.stringify(message, null, 2));
-    // attach debugger to sender tab
 
-    // get nodeid for the clientX and clientY coordinates
-    const { clientX, clientY } = message;
-    const nodeId = await chrome.debugger.sendCommand({ tabId: sender.tab.id }, 'DOM.getNodeForLocation', {
-      x: clientX,
-      y: clientY,
-      includeUserAgentShadowDOM: true,
-    });
-    console.log('Node id: ' + JSON.stringify(nodeId, null, 2));
-    const resultNode = await chrome.debugger.sendCommand({ tabId: sender.tab.id }, 'DOM.describeNode', {
-      backendNodeId: nodeId.backendNodeId,
-      depth: -1,
-      pierce: true,
-    });
-    console.log('Node Description: ' + JSON.stringify(resultNode, null, 2));
-    chrome.debugger.sendCommand({ tabId: sender.tab.id }, 'DOM.highlightNode', {
-      backendNodeId: nodeId.backendNodeId,
-      highlightConfig: {
-        contentColor: {
-          r: 255,
-          g: 0,
-          b: 0,
-          a: 0.3,
-        },
-        borderColor: {
-          r: 255,
-          g: 0,
-          b: 0,
-          a: 0.3,
-        },
-        showInfo: true,
-      },
+    const { rect } = message;
+    const { x, y, width, height } = rect;
+    const ratio = message.ratio || 1;
+    // highlight rect using dom
+    await chrome.debugger.sendCommand({ tabId: sender.tab.id }, 'DOM.highlightRect', {
+      x: Math.floor(x / ratio),
+      y: Math.floor(y / ratio),
+      width: Math.floor(width / ratio),
+      height: Math.floor(height / ratio),
+      color: { r: 255, g: 0, b: 0, a: 0.3 },
     });
     return;
   }
+  if (message.type === 'drawRectMs') {
+    console.log('Message received IN SW: ' + JSON.stringify(message, null, 2));
+    await chrome.tabs.sendMessage(sender.tab.id, message);
+    return;
+  }
   if (message.type === 'attachDebugger') {
+    try {
+      await chrome.debugger.detach({ tabId: sender.tab.id });
+    } catch (e) {
+      // ignore
+    }
     await chrome.debugger.attach({ tabId: sender.tab.id }, '1.3');
     // enable dom
     await chrome.debugger.sendCommand({ tabId: sender.tab.id }, 'DOM.enable');
