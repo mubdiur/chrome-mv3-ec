@@ -3,7 +3,8 @@ console.log('Content script loaded!');
 // listen for click event
 document.addEventListener('click', function(e) {
   // send message to background script
-
+  e.preventDefault();
+  e.stopPropagation();
   let backTrack = 0;
   currentWindow = window.self;
   let x = e.clientX, y = e.clientY;
