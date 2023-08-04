@@ -74,10 +74,6 @@ window.addEventListener('click', async function (e) {
   currentWindow = window.self;
   let x = e.clientX, y = e.clientY;
 
-  // console the current window framewelement offsets
-  console.log('currentWindow.frameElement.offsetLeft', currentWindow.frameElement.offsetLeft);
-  console.log('currentWindow.frameElement.offsetTop', currentWindow.frameElement.offsetTop);
-
   while (currentWindow !== window.top) {
     if (currentWindow.frameElement && currentWindow.frameElement.offsetLeft)
       x += currentWindow.frameElement.offsetLeft;
