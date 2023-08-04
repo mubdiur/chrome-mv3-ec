@@ -55,17 +55,30 @@ chrome.runtime.onConnectExternal.addListener((port) => {
 
 chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
   if (message.type === 'clickEvent') {
-    console.log('Message received: ' + JSON.stringify(message, null, 2));
+    console.log('Message received sw: ' + JSON.stringify(message, null, 2));
 
     const { rect } = message;
     const { x, y, width, height } = rect;
-    const ratio = message.ratio || 1;
+  
+    // get Page.getLayoutMetrics
+    const layoutMatrics = await chrome.debugger.sendCommand({ tabId: sender.tab.id }, 'Page.getLayoutMetrics');  
+    // print layoutMatrics
+    console.log('layoutMatrics: ' + JSON.stringify(layoutMatrics, null, 2));
+
+    const cssVisualViewport = layoutMatrics.cssVisualViewport;
+    const visualViewport = layoutMatrics.visualViewport;
+    const zoom = cssVisualViewport.zoom;
+    const widthRatio = visualViewport.clientWidth / cssVisualViewport.clientWidth / zoom;
+    const heightRatio = visualViewport.clientHeight / cssVisualViewport.clientHeight / zoom;
+    
+    console.log('widthRatio: ' + widthRatio);
+    console.log('heightRatio: ' + heightRatio);
     // highlight rect using dom
     await chrome.debugger.sendCommand({ tabId: sender.tab.id }, 'DOM.highlightRect', {
-      x: Math.floor(x / ratio),
-      y: Math.floor(y / ratio),
-      width: Math.floor(width / ratio),
-      height: Math.floor(height / ratio),
+      x: Math.floor(x * zoom / widthRatio),
+      y: Math.floor(y * zoom / heightRatio),
+      width: Math.floor(width * zoom / widthRatio),
+      height: Math.floor(height * zoom / heightRatio),
       color: { r: 255, g: 0, b: 0, a: 0.3 },
     });
     return;
@@ -78,6 +91,7 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
   if (message.type === 'attachDebugger') {
     try {
       await chrome.debugger.detach({ tabId: sender.tab.id });
+      await chrome.debugger.sendCommand({ tabId: sender.tab.id }, 'Page.enable');
     } catch (e) {
       // ignore
     }

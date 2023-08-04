@@ -10,21 +10,42 @@ const getBoundingRect = (event, window) => {
   const rect = element.getBoundingClientRect();
   console.log(element, rect);
   let currentWindow = window.self;
-  let x = rect.x, y = rect.y;
-  while (currentWindow !== window.top) {
-    x += currentWindow.frameElement.offsetLeft;
-    y += currentWindow.frameElement.offsetTop;
+
+  let x = rect.x, y = rect.y, width = rect.width, height = rect.height;
+
+  while (currentWindow && currentWindow !== window.top) {
+    // add the offsets
+    if (currentWindow.frameElement && currentWindow.frameElement.offsetLeft)
+      x += currentWindow.frameElement.offsetLeft;
+    if (currentWindow.frameElement && currentWindow.frameElement.offsetTop)
+      y += currentWindow.frameElement.offsetTop;
+
+    // add the borders
+    if (currentWindow.frameElement && currentWindow.frameElement.clientLeft)
+      x += currentWindow.frameElement.clientLeft;
+    if (currentWindow.frameElement && currentWindow.frameElement.clientTop)
+      y += currentWindow.frameElement.clientTop;
     currentWindow = currentWindow.parent;
+    // remove the scroll
+    if (currentWindow && currentWindow.scrollX)
+      x -= currentWindow.scrollX;
+    if (currentWindow && currentWindow.scrollY)
+      y -= currentWindow.scrollY;
   }
-  return {x, y, width: rect.width, height: rect.height};
+
+  if (x < 0) x = 0;
+  if (y < 0) y = 0;
+  return { x, y, width, height };
 }
 
 const drawRectMs = (rect, ms) => {
   // create a div
   const div = document.createElement('div');
   div.style.position = 'absolute';
-  div.style.left = rect.x + 'px';
-  div.style.top = rect.y + 'px';
+  // add scroll width
+
+  div.style.left = rect.x + window.scrollX + 'px';
+  div.style.top = rect.y + window.scrollY + 'px';
   div.style.width = rect.width + 'px';
   div.style.height = rect.height + 'px';
   div.style.border = '2px solid red';
@@ -42,35 +63,52 @@ const drawRectMs = (rect, ms) => {
   setTimeout(() => {
     document.body.removeChild(div);
   }
-  , ms);
+    , ms);
 }
 // listen for click event
-window.addEventListener('click', function(e) {
+window.addEventListener('click', async function (e) {
   // send message to background script
   e.preventDefault();
   e.stopPropagation();
   let backTrack = 0;
   currentWindow = window.self;
   let x = e.clientX, y = e.clientY;
+
+  // console the current window framewelement offsets
+  console.log('currentWindow.frameElement.offsetLeft', currentWindow.frameElement.offsetLeft);
+  console.log('currentWindow.frameElement.offsetTop', currentWindow.frameElement.offsetTop);
+
   while (currentWindow !== window.top) {
-    backTrack++;
-    x += currentWindow.frameElement.offsetLeft;
-    y += currentWindow.frameElement.offsetTop;
+    if (currentWindow.frameElement && currentWindow.frameElement.offsetLeft)
+      x += currentWindow.frameElement.offsetLeft;
+    if (currentWindow.frameElement && currentWindow.frameElement.offsetTop)
+      y += currentWindow.frameElement.offsetTop;
+
+    // add the borders
+    if (currentWindow.frameElement && currentWindow.frameElement.clientLeft)
+      x += currentWindow.frameElement.clientLeft;
+    if (currentWindow.frameElement && currentWindow.frameElement.clientTop)
+      y += currentWindow.frameElement.clientTop;
     currentWindow = currentWindow.parent;
+    // remove the scroll
+    if (currentWindow && currentWindow.scrollX)
+      x -= currentWindow.scrollX;
+    if (currentWindow && currentWindow.scrollY)
+      y -= currentWindow.scrollY;
   }
-  console.log('backTrack: ' , backTrack, 'x: ', x, 'y: ', y);
-  // chrome.runtime.sendMessage({type: 'drawRectMs', rect: getBoundingRect(e, window), ms: 3000});
-  chrome.runtime.sendMessage({type: 'clickEvent', rect: getBoundingRect(e, window), ratio: window.devicePixelRatio});
+  console.log('x: ', x, 'y: ', y);
+  chrome.runtime.sendMessage({ type: 'clickEvent', rect: getBoundingRect(e, window)});
+  // chrome.runtime.sendMessage({ type: 'drawRectMs', rect: getBoundingRect(e, window), ms: 5000 });
 
 }, true);
 
 
 if (window.self === window.top) {
   // send message to background script
-  chrome.runtime.sendMessage({type: 'attachDebugger'});
+  chrome.runtime.sendMessage({ type: 'attachDebugger' });
   chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
+    console.log('Message received in root content: ' + JSON.stringify(message, null, 2));
     if (message.type === 'drawRectMs') {
-      console.log('Message received: ' + JSON.stringify(message, null, 2));
       drawRectMs(message.rect, message.ms);
     }
   });
