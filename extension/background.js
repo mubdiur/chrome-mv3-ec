@@ -4,6 +4,8 @@ let intervalSeconds = minutes ? minutes * 60 : seconds;
 let intervalMs = intervalSeconds * 1000;
 let connectionBeginTime = Date.now();
 
+let frameMapById = {}
+
 function formatTime(milliseconds) {
   var seconds = Math.floor(milliseconds / 1000);
   var minutes = Math.floor(seconds / 60);
@@ -53,7 +55,7 @@ chrome.runtime.onConnectExternal.addListener((port) => {
   _port = port;
 });
 
-chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
+const handler = async (message, sender, sendResponse) => {
   if (message.type === 'clickEvent') {
     console.log('Message received sw: ' + JSON.stringify(message, null, 2));
 
@@ -101,6 +103,58 @@ chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
     // enable overlay
     await chrome.debugger.sendCommand({ tabId: sender.tab.id }, 'Overlay.enable');
   }
+
+  if (message.type === 'setFrames') {
+    const allFrames = await chrome.webNavigation.getAllFrames({tabId: sender.tab.id});
+    const mappedFrames = buildTree(allFrames);
+    const children = mappedFrames[sender.frameId];
+    const frames = message.frames;
+
+    console.log('frames and children: ', frames, children);
+    const frameObj = [];
+    for (let i = 0; frames.length && i < frames.length; i++) {
+      const frame = frames[i];
+      let child = null;
+      try {
+        child = children.find((child) => child.url === frame.src);
+      } catch (_e) {
+        // ignore
+      }
+      if (child) {
+        frameObj[i] = { ...frame, frameId: child.frameId, parentFrameId: sender.frameId };
+        frameMapById[child.frameId] = frameObj[i];
+      }
+      else
+        frameObj[i] = {}
+    }
+    return;
+  }
+  if (message.type === 'getFrame') {
+    if(!frameMapById[sender.frameId]) return;
+    let frameId = sender.frameId;
+    let frameLocation = '';
+    let x = 0, y = 0;
+    while (frameId !== 0) {
+      const frame = frameMapById[frameId];
+      if(!frame) break;
+      x += frame.bounding_rect.x;
+      y += frame.bounding_rect.y;
+      frameLocation += ':' + frame.index;
+      frameId = frame.parentFrameId;
+    }
+    console.log('frameId', frameId);
+    if (frameId!==0) sendResponse(null)
+    else sendResponse({ frameLocation, actualCoordinates: {x, y} });
+  }
+  if (message.type === 'recalculateFrames') {
+    frameMapById = {};
+    chrome.tabs.sendMessage(sender.tab.id, { type: 'onCompleted' });
+  }
+}
+
+chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
+  handler(message, sender, sendResponse);
+  return true;
 });
 // keep sending count++ with an interval of 3 seconds through _port if _port is not null
 setInterval(() => {
@@ -117,3 +171,30 @@ setInterval(() => {
     _port.postMessage(message);
   }
 }, intervalMs);
+
+function buildTree(objects) {
+  const map = {};
+
+  for (const obj of objects) {
+    if(obj.parentFrameId === -1) {
+      continue;
+    }
+    if(!(map[obj.parentFrameId] && map[obj.parentFrameId].length)) {
+      map[obj.parentFrameId] = [];
+    }
+    if(!(map[obj.frameId] && map[obj.frameId].length)) {
+      map[obj.frameId] = [];
+    }
+    map[obj.parentFrameId].push({
+      frameId: obj.frameId,
+      url: obj.url,
+    });
+  }
+
+  return map;
+}
+
+chrome.webNavigation.onCompleted.addListener((details) => {
+  console.log('onCompleted: ', details);
+  chrome.tabs.sendMessage(details.tabId, { type: 'onCompleted', details });
+});
